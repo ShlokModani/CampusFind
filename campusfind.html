@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CampusFind – VIT Bibwewadi</title>
+<style>
+:root{--bg:#eef2ea;--panel:#fbfcf9;--ink:#1d2b2a;--mute:#5d6d6a;--line:#cfd8cc;--acc:#1f6f6b;--route:#d4472b;--ground:#e3ead9;--bld:#c9d9cf;--road:#f7f7f2;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a19;--panel:#192523;--ink:#e6efe9;--mute:#98aaa5;--line:#2c3d3a;--acc:#5cc2ba;--route:#ff7a5c;--ground:#18231f;--bld:#27403a;--road:#2b3835}}
+:root[data-theme="dark"]{--bg:#121a19;--panel:#192523;--ink:#e6efe9;--mute:#98aaa5;--line:#2c3d3a;--acc:#5cc2ba;--route:#ff7a5c;--ground:#18231f;--bld:#27403a;--road:#2b3835}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Trebuchet MS",Verdana,sans-serif}
+h1{font:700 22px/1.1 Georgia,"Times New Roman",serif;margin:0}
+.wrap{display:grid;grid-template-columns:340px 1fr;gap:14px;max-width:1100px;margin:0 auto;padding:14px}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 28px);overflow:auto}
+.sub{color:var(--mute);font-size:13px;margin:2px 0 0}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+input:focus,select:focus,button:focus-visible,.item:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button{font:inherit;padding:9px 10px;border-radius:6px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:13px}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.list{display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:120px}
+.item{padding:8px 10px;border:1px solid var(--line);border-radius:6px;cursor:pointer;background:var(--bg)}
+.item b{display:block}.item span{color:var(--mute);font-size:12.5px}
+.item.sel{border-color:var(--acc);box-shadow:inset 3px 0 0 var(--acc)}
+.dir{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:14px}
+.dir ol{margin:6px 0 0;padding-left:20px}
+.map{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative;min-height:420px}
+svg{display:block;width:100%;height:auto;touch-action:none;cursor:grab}
+.note{font-size:12px;color:var(--mute);padding:8px 12px;border-top:1px solid var(--line)}
+.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:34px;padding:6px}
+@media(max-width:800px){.wrap{grid-template-columns:1fr}.side{max-height:none}.map{order:-1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<aside class="side">
+ <div><h1>CampusFind</h1><p class="sub">VIT Bibwewadi campus navigator</p></div>
+ <input id="q" type="search" placeholder="Search a classroom, lab, office…" aria-label="Search places">
+ <div class="chips" id="chips"></div>
+ <div class="list" id="list" role="list"></div>
+ <div class="row">
+  <select id="from" aria-label="From"></select>
+  <select id="to" aria-label="To"></select>
+ </div>
+ <div class="row"><button id="go">Get directions</button><button class="ghost" id="swap">Swap</button></div>
+ <div class="dir" id="dir">Pick a start and a destination to see directions.</div>
+</aside>
+<main class="map">
+ <svg id="svg" viewBox="0 0 800 560" role="img" aria-label="Campus map"></svg>
+ <div class="zoom"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view">⟲</button></div>
+ <div class="note">Sample layout with placeholder locations. Replace the PLACES and PATHS data in the page’s script with the real campus details.</div>
+</main>
+</div>
+<script>
+// ---- Editable campus data (x,y on an 800×560 grid) ----
+var PLACES=[
+ {id:"gate",name:"Main Gate",cat:"Entrance",x:90,y:480,info:"Entry point for visitors and students."},
+ {id:"admin",name:"Administrative Office",cat:"Office",x:200,y:360,info:"Admissions, fees, certificates."},
+ {id:"lib",name:"Library",cat:"Facility",x:390,y:360,info:"Reading hall and digital resources."},
+ {id:"canteen",name:"Canteen",cat:"Facility",x:620,y:430,info:"Food court and seating area."},
+ {id:"seminar",name:"Seminar Hall",cat:"Hall",x:210,y:190,info:"Talks, workshops and events."},
+ {id:"cls",name:"Classroom Block A",cat:"Classroom",x:400,y:170,info:"Lecture rooms A101–A410."},
+ {id:"clsb",name:"Classroom Block B",cat:"Classroom",x:590,y:170,info:"Lecture rooms B101–B310."},
+ {id:"lab1",name:"Computer Lab",cat:"Laboratory",x:690,y:290,info:"Programming and networking labs."},
+ {id:"lab2",name:"Electronics Lab",cat:"Laboratory",x:500,y:290,info:"Circuits and embedded systems."},
+ {id:"ground",name:"Sports Ground",cat:"Facility",x:700,y:480,info:"Playground and courts."}
+];
+var J=[ // junctions (invisible waypoints)
+ {id:"j1",x:90,y:420},{id:"j2",x:200,y:420},{id:"j3",x:390,y:420},{id:"j4",x:620,y:340},
+ {id:"j5",x:210,y:250},{id:"j6",x:400,y:250},{id:"j7",x:590,y:250},{id:"j8",x:500,y:340}
+];
+var PATHS=[["gate","j1"],["j1","j2"],["j2","admin"],["j2","j3"],["j3","lib"],["j3","j8"],["j8","lab2"],["j8","j4"],["j4","canteen"],["j4","lab1"],["canteen","ground"],
+ ["admin","j5"],["j5","seminar"],["j5","j6"],["j6","cls"],["j6","j7"],["j7","clsb"],["j6","lab2"],["j7","lab1"],["lib","j8"]];
+// ---- Graph ----
+var N={};PLACES.concat(J).forEach(function(n){N[n.id]=n});
+var adj={};function link(a,b){var d=Math.hypot(N[a].x-N[b].x,N[a].y-N[b].y);(adj[a]=adj[a]||[]).push([b,d]);(adj[b]=adj[b]||[]).push([a,d])}
+PATHS.forEach(function(p){link(p[0],p[1])});
+function route(a,b){var dist={},prev={},seen={},k;for(k in N)dist[k]=1e9;dist[a]=0;
+ while(true){var u=null;for(k in dist)if(!seen[k]&&(u===null||dist[k]<dist[u]))u=k;if(u===null||dist[u]>=1e9)break;if(u===b)break;seen[u]=1;
+  (adj[u]||[]).forEach(function(e){if(dist[u]+e[1]<dist[e[0]]){dist[e[0]]=dist[u]+e[1];prev[e[0]]=u}})}
+ if(dist[b]>=1e9)return null;var p=[b];while(p[0]!==a)p.unshift(prev[p[0]]);return{path:p,d:dist[b]}}
+// ---- Map ----
+var svg=document.getElementById("svg"),NS="http://www.w3.org/2000/svg",vb={x:0,y:0,w:800,h:560},sel=null,routeP=null;
+function el(t,a,p){var e=document.createElementNS(NS,t);for(var k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+function draw(){svg.innerHTML="";
+ el("rect",{x:0,y:0,width:800,height:560,fill:"var(--ground)"});
+ PATHS.forEach(function(p){var a=N[p[0]],b=N[p[1]];el("line",{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:"var(--road)","stroke-width":14,"stroke-linecap":"round"})});
+ if(routeP){el("polyline",{points:routeP.map(function(i){return N[i].x+","+N[i].y}).join(" "),fill:"none",stroke:"var(--route)","stroke-width":5,"stroke-dasharray":"2 9","stroke-linecap":"round","stroke-linejoin":"round"})}
+ PLACES.forEach(function(p){var on=sel===p.id,end=routeP&&(p.id===routeP[0]||p.id===routeP[routeP.length-1]);
+  var g=el("g",{style:"cursor:pointer",tabindex:0,role:"button","aria-label":p.name});
+  el("rect",{x:p.x-26,y:p.y-18,width:52,height:36,rx:5,fill:on||end?"var(--acc)":"var(--bld)",stroke:"var(--acc)","stroke-width":on?3:1},g);
+  var t=el("text",{x:p.x,y:p.y+34,"text-anchor":"middle","font-size":12,fill:"var(--ink)","paint-order":"stroke",stroke:"var(--ground)","stroke-width":3},g);t.textContent=p.name;
+  g.addEventListener("click",function(){choose(p.id)});g.addEventListener("keydown",function(e){if(e.key==="Enter")choose(p.id)})})}
+function setVB(){svg.setAttribute("viewBox",vb.x+" "+vb.y+" "+vb.w+" "+vb.h)}
+function zoom(f){var cx=vb.x+vb.w/2,cy=vb.y+vb.h/2;vb.w=Math.min(800,Math.max(200,vb.w*f));vb.h=vb.w*0.7;vb.x=Math.min(800-vb.w,Math.max(0,cx-vb.w/2));vb.y=Math.min(560-vb.h,Math.max(0,cy-vb.h/2));setVB()}
+document.getElementById("zi").onclick=function(){zoom(.7)};document.getElementById("zo").onclick=function(){zoom(1.4)};
+document.getElementById("zr").onclick=function(){vb={x:0,y:0,w:800,h:560};setVB()};
+var drag=null;svg.addEventListener("pointerdown",function(e){drag={x:e.clientX,y:e.clientY}});
+window.addEventListener("pointerup",function(){drag=null});
+window.addEventListener("pointermove",function(e){if(!drag)return;var s=vb.w/svg.clientWidth;vb.x=Math.min(800-vb.w,Math.max(0,vb.x-(e.clientX-drag.x)*s));vb.y=Math.min(560-vb.h,Math.max(0,vb.y-(e.clientY-drag.y)*s));drag={x:e.clientX,y:e.clientY};setVB()});
+svg.addEventListener("wheel",function(e){e.preventDefault();zoom(e.deltaY<0?.85:1.18)},{passive:false});
+// ---- UI ----
+var cat="All",q=document.getElementById("q"),list=document.getElementById("list"),from=document.getElementById("from"),to=document.getElementById("to"),dir=document.getElementById("dir");
+var cats=["All"].concat(PLACES.map(function(p){return p.cat}).filter(function(c,i,a){return a.indexOf(c)===i}));
+function chips(){var c=document.getElementById("chips");c.innerHTML="";cats.forEach(function(k){var b=document.createElement("button");b.className="chip"+(k===cat?" on":"");b.textContent=k;b.onclick=function(){cat=k;chips();renderList()};c.appendChild(b)})}
+function renderList(){var s=q.value.toLowerCase().trim();list.innerHTML="";
+ var r=PLACES.filter(function(p){return(cat==="All"||p.cat===cat)&&(p.name+" "+p.cat+" "+p.info).toLowerCase().indexOf(s)>-1});
+ if(!r.length){list.innerHTML='<div class="sub">No match. Try a different word or choose All.</div>';return}
+ r.forEach(function(p){var d=document.createElement("div");d.className="item"+(sel===p.id?" sel":"");d.tabIndex=0;d.setAttribute("role","listitem");
+  d.innerHTML="<b>"+p.name+"</b><span>"+p.cat+" · "+p.info+"</span>";d.onclick=function(){choose(p.id)};d.onkeydown=function(e){if(e.key==="Enter")choose(p.id)};list.appendChild(d)})}
+function choose(id){sel=id;to.value=id;routeP=null;dir.innerHTML="<b>"+N[id].name+"</b><br>"+N[id].info+"<br>Choose a start point and press Get directions.";draw();renderList()}
+function fill(s){PLACES.forEach(function(p){var o=document.createElement("option");o.value=p.id;o.textContent=p.name;s.appendChild(o)})}
+function dirText(a,b,p,d){var out=[],i,last=null;
+ for(i=1;i<p.length;i++){var A=N[p[i-1]],B=N[p[i]],ang=Math.atan2(B.y-A.y,B.x-A.x),dirn=["east","south","west","north"][((Math.round(ang/(Math.PI/2))%4)+4)%4];
+  if(dirn!==last&&p[i-1].charAt(0)==="j"||i===1){out.push("Head "+dirn+(p[i].charAt(0)==="j"?"":" to "+N[p[i]].name))}last=dirn;
+  if(N[p[i]].cat&&p[i]!==b)out.push("Pass "+N[p[i]].name)}
+ out.push("Arrive at "+N[b].name);return out}
+function go(){var a=from.value,b=to.value;if(a===b){dir.textContent="Start and destination are the same place.";routeP=null;draw();return}
+ var r=route(a,b);if(!r){dir.textContent="No walking path found between these places.";return}
+ routeP=r.path;var m=Math.round(r.d*0.6),min=Math.max(1,Math.round(m/80));
+ dir.innerHTML="<b>"+N[a].name+" → "+N[b].name+"</b><br>About "+m+" m, "+min+" min walk<ol>"+dirText(a,b,r.path,r.d).map(function(s){return"<li>"+s+"</li>"}).join("")+"</ol>";draw()}
+fill(from);fill(to);from.value="gate";to.value="lib";
+document.getElementById("go").onclick=go;
+document.getElementById("swap").onclick=function(){var t=from.value;from.value=to.value;to.value=t;go()};
+q.oninput=renderList;chips();renderList();draw();
+</script>
+</body>
+</html>
